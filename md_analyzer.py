@@ -321,7 +321,7 @@ class md_analysis():
                     'please input: starting time (ns),ending time(ns), number of frames\n').split(',')
                 self.extract_complex(start=float(st), end=float(ed), slices=int(num_frames))
             elif job == '3':
-                self.distance_analysis(pdbfile.split('.')[0])
+                self.distance_analysis()
             elif job == '4':
                 print('running ligand atom rmsf...')
                 self.ligand_rmsf()
