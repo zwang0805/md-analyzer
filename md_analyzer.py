@@ -1,9 +1,10 @@
 import os
-os.environ['OPENBLAS_NUM_THREADS'] = '1'
 import MDAnalysis as mda
 import pandas as pd
 import numpy as np
 from MDAnalysis.analysis import rms
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from MDAnalysis.analysis import align, diffusionmap
 from MDAnalysis import transformations
@@ -123,7 +124,8 @@ class md_analysis():
         # Save the figure to a file
         suffix=atom_label.replace(' ','_').replace(',','_')
         plt.savefig(os.path.join(self.working_directory,'analysis','%s_dist_analysis_%s.png' % (self.pdb,suffix)), dpi=300)
-        plt.close()
+        plt.clf()
+        plt.close('all')
         print('the result figure is saved in %s/analysis/%s_dist_analysis_%s.png\n' % (self.working_directory, self.pdb,suffix))
 
     def rmsd(self,rmsd_step=100):
@@ -162,7 +164,7 @@ class md_analysis():
         fig=ax.get_figure()
         fig.savefig(os.path.join(self.working_directory,'analysis','%s_rmsd.png' % self.pdb))
         rmsd_df.to_csv(os.path.join(self.working_directory,'analysis','%s_rmsd.csv' % self.pdb))
-        plt.close()
+        plt.close('all')
         print('the result figure is saved in %s/analysis/%s_rmsd.png\n' % (self.working_directory, self.pdb))
 
     def extract_complex(self,start=0, end=0,slices=50):
@@ -247,7 +249,7 @@ class md_analysis():
         plt.xlabel('Atom index')
         plt.ylabel('RMSF ($\AA$)')
         plt.savefig(os.path.join(self.working_directory,'analysis','%s_ligand_rmsf.png' % (self.pdb)))
-        plt.close()
+        plt.close('all')
         print('the result figure is saved in %s/analysis/%s_ligand_rmsf.png\n' % (self.working_directory, self.pdb))
     
     def pro_lig_int(self):
@@ -266,16 +268,13 @@ class md_analysis():
         Since MDAnalysis uses van der Waals radii for bond detection, you can add the default radii if there is a atom is not recognized.
 
         ligand_selection.guess_bonds(vdwradii={"Cl": 1.75,"Br": 1.85,"I": 1.98})
-        
-        3. If errors are showing and its related to multiprocess, please run the following command before you run this python script:
-        export OPENBLAS_NUM_THREADS=1
 
         Returns
         -------
         1. plot of the protein-ligand interaction
         2. the fingerprint csv file that facilitate you to calculate the overall percent of precence of any interaction of interest.
         """
-        
+
         ligand_selection=self.u.select_atoms('not (protein or resname %s or resname NA or resname CL)' % self.solvent_str)
         if '.pdb' in self.pdb:
             ligand_selection.guess_bonds(vdwradii={"Cl": 1.75,"Br": 1.85,"I": 1.98})
@@ -299,7 +298,7 @@ class md_analysis():
         df.to_csv(os.path.join(self.working_directory,'analysis','%s_fingerprint.csv' % (self.pdb)))
         fp.plot_barcode()
         plt.savefig(os.path.join(self.working_directory,'analysis','%s_prolig.png' % (self.pdb)))
-        plt.close()
+        plt.close('all')
         print('the result figure is saved in %s/analysis/%s_prolig.png\n' % (self.working_directory, self.pdb))
 
     def run(self):
