@@ -150,9 +150,9 @@ class md_analysis():
             rmsd_analysis.run(step=rmsd_step)
             rmsd_df = pd.DataFrame(rmsd_analysis.rmsd[:, 2:],
                                columns=['backbone','C-alphas', 'protein'],
-                               index=rmsd_analysis.rmsd[:, 0])
+                               index=rmsd_analysis.rmsd[:, 0]*self.dt)
         else:
-            rmsd_analysis = rms.RMSD(self.u, select='backbone', groupselections=['name CA', 'protein', 'not (resname %s or resname HW or resname OW or resname SOL or resname NA or resname CL or protein)' % self.solvent_str])
+            rmsd_analysis = rms.RMSD(self.u, select='backbone', groupselections=['name CA', 'protein', 'not (resname %s or resname NA or resname CL or protein)' % self.solvent_str])
             rmsd_analysis.run(step=rmsd_step)
             rmsd_df = pd.DataFrame(rmsd_analysis.rmsd[:, 2:],
                                columns=['backbone','C-alphas', 'protein','ligand'],
