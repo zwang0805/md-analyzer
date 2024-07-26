@@ -10,19 +10,21 @@ from MDAnalysis.analysis import align, diffusionmap
 from MDAnalysis import transformations
 from MDAnalysis.analysis import distances
 import prolif as plf
+from sklearn.cluster import AgglomerativeClustering
 
 class md_analysis():
     def __init__(self, directory=''):
         self.path = os.path.split(os.path.realpath(__file__))[0]
         if directory == '':
-            self.working_directory = os.path.join(self.path)
+            self.working_directory = os.path.join(self.path, 'working_directory')
         else:
-            self.working_directory = directory
+            self.working_directory = os.path.join(self.path, 'working_directory', directory)
         if not os.path.exists('%s/analysis' % self.working_directory):
             os.mkdir('%s/analysis' % self.working_directory)
-        self.solvent_str='WAT'
+        self.solvent_str='(resname WAT or resname SOL or resname HOH)'
+        self.ion_str='(resname NA or resname CL or resname NA? or resname CL?)'
+        self.ligand_str= '(not (%s or %s or protein))' % (self.solvent_str, self.ion_str)
         
-
     def read_pdb_dcd(self,pdb,dcd,apo=False):
         """Read the input topology and trajectory file
         Parameters
@@ -38,34 +40,34 @@ class md_analysis():
         this issue with an incresed of analysis time. This script does not ensure the successful pdb correction for every system, please check
         the result carefully.
         """
-        self.u = mda.Universe(os.path.join(self.working_directory, pdb), os.path.join(self.working_directory, dcd))
+        from MDAnalysis.topology.guessers import guess_types
+        self.u = mda.Universe(os.path.join(self.working_directory, pdb), os.path.join(self.working_directory,'results', dcd))
         self.dt=self.u.trajectory.dt
-        if '.pdb' in pdb:
-            self.solvent_str='HOH'
-        elif '.gro' in pdb:
-            from MDAnalysis.topology.guessers import guess_types
-            self.solvent_str='SOL'
+
+        if '.gro' in pdb:
             self.u.atoms.guess_bonds()
             elements = guess_types(self.u.atoms.types)
             self.u.add_TopologyAttr('elements', elements)
         self.pdb=pdb
         self.apo=apo
-        if apo:
-            return
-
         
         prot = self.u.select_atoms('protein')
         ref_u=self.u.copy()
+        ref_u.trajectory[0]
         reference = ref_u.select_atoms('protein')
-        ag = self.u.select_atoms('not (resname NA or resname CL)')
-        
-        self.workflow = (mda.transformations.unwrap(ag),
+        ag = self.u.select_atoms('not (%s or %s)' % (self.ion_str, self.solvent_str))
+        if apo:
+            ag.guess_bonds()
+        water=self.u.select_atoms(self.solvent_str)
+        self.workflow = (
                     mda.transformations.center_in_box(prot, center='mass'),
                     mda.transformations.wrap(ag, compound='fragments'),
-                    mda.transformations.fit_rot_trans(prot, reference))
+                    mda.transformations.wrap(water, compound='residues'),
+                    mda.transformations.fit_rot_trans(prot, reference)
+                    )
 
         self.u.trajectory.add_transformations(*self.workflow)
-        
+         
     
     def distance_analysis(self,atom_label='',dist_step=100):
         """Calculate the distance between two atoms of the MD results.
@@ -94,12 +96,11 @@ class md_analysis():
         """
         if atom_label=='':
             atom_label=input('please input atom label, you can use ligand to indicate your small molecule (e.g. resid 30 and name CZ, ligand and name S25):\nplease refer to the following website for atom label edition:\nhttps://userguide.mdanalysis.org/stable/selections.html\n')
-        ligand_exp = '(not (resname %s or resname NA or resname CL or protein))' % self.solvent_str
-        atom_label2=atom_label.replace('ligand',ligand_exp)
+        atom_label2=atom_label.replace('ligand',self.ligand_str)
         atom1_exp,atom2_exp=atom_label2.split(',')
         atom1 = self.u.select_atoms(atom1_exp)
         atom2 = self.u.select_atoms(atom2_exp)
-        ligand_atom=self.u.select_atoms(ligand_exp)
+        ligand_atom=self.u.select_atoms(self.ligand_str)
         
         dist = []
         time_ids=[]
@@ -128,6 +129,48 @@ class md_analysis():
         plt.close('all')
         print('the result figure is saved in %s/analysis/%s_dist_analysis_%s.png\n' % (self.working_directory, self.pdb,suffix))
 
+    def heatmap(self):
+        dist_matrix_protein = self.RMSD_dist_frames(self.u, "protein")
+        print(dist_matrix_protein)
+        dist_matrix_ligand = self.RMSD_dist_frames(self.u, self.ligand_str)
+        max_dist = max(np.amax(dist_matrix_ligand), np.amax(dist_matrix_protein))
+        fig, ax = plt.subplots(1, 2)
+        fig.suptitle("RMSD between the frames")
+
+        # protein image
+        img1 = ax[0].imshow(dist_matrix_protein, cmap="viridis", vmin=0, vmax=max_dist)
+        ax[0].title.set_text("protein")
+        ax[0].set_xlabel("frames")
+        ax[0].set_ylabel("frames")
+
+        # ligand image
+        img2 = ax[1].imshow(dist_matrix_ligand, cmap="viridis", vmin=0, vmax=max_dist)
+        ax[1].title.set_text("Ligand")
+        ax[1].set_xlabel("frames")
+
+        fig.colorbar(img1, ax=ax, orientation="horizontal", fraction=0.1, label="RMSD (Å)")
+        fig.savefig(os.path.join(self.working_directory, 'analysis', '%s_rmsd2.png' % self.pdb))
+        plt.close()
+
+    def RMSD_dist_frames(self,universe, selection):
+        """Calculate the RMSD between all frames in a matrix.
+    
+        Parameters
+        ----------
+        universe: MDAnalysis.core.universe.Universe
+            MDAnalysis universe.
+        selection: str
+            Selection string for the atomgroup to be investigated, also used during alignment.
+    
+        Returns
+        -------
+        array: np.ndarray
+            Numpy array of RMSD values.
+        """
+        pairwise_rmsd = diffusionmap.DistanceMatrix(universe, select=selection)
+        pairwise_rmsd.run()
+        return pairwise_rmsd.results.dist_matrix
+        
     def rmsd(self,rmsd_step=100):
         """Calculate the RMSD of the MD trajectory.
 
@@ -152,7 +195,7 @@ class md_analysis():
                                columns=['backbone','C-alphas', 'protein'],
                                index=rmsd_analysis.rmsd[:, 0]*self.dt)
         else:
-            rmsd_analysis = rms.RMSD(self.u, select='backbone', groupselections=['name CA', 'protein', 'not (resname %s or resname NA or resname CL or protein)' % self.solvent_str])
+            rmsd_analysis = rms.RMSD(self.u, select='backbone', groupselections=['name CA', 'protein', self.ligand_str])
             rmsd_analysis.run(step=rmsd_step)
             rmsd_df = pd.DataFrame(rmsd_analysis.rmsd[:, 2:],
                                columns=['backbone','C-alphas', 'protein','ligand'],
@@ -201,7 +244,7 @@ class md_analysis():
                     selected_frames.append(ts)
                     time_list.append(time)
 
-        pro = universe.universe.select_atoms('not (resname NA or resname CL)')
+        pro = universe.universe.select_atoms('not %s' % self.ion_str)
         num_frames=len(selected_frames)
         
         if num_frames<slices:
@@ -225,11 +268,11 @@ class md_analysis():
         sequence of atom index and its corresponding rmsf
 
         """
-        average = align.AverageStructure(self.u, self.u, select=selection,
-                                         ref_frame=0).run()
-        ref = average.results.universe
-        aligner = align.AlignTraj(self.u, ref, select=selection,
-                                  in_memory=True).run()
+        #average = align.AverageStructure(self.u, self.u, select=selection,
+                                         #ref_frame=0).run()
+        #ref = average.results.universe
+        #aligner = align.AlignTraj(self.u, ref, select=selection,
+        #                          in_memory=True).run()
         ag = self.u.select_atoms(selection)
         R = rms.RMSF(ag).run()
         atoms_num=len(ag)
@@ -243,7 +286,7 @@ class md_analysis():
         the plot of atom index and rmsf
         
         """
-        lig=self.rmsf_basis('not (protein or resname %s or resname NA or resname CL)' % self.solvent_str)
+        lig=self.rmsf_basis(self.ligand_str)
         print(lig[0], lig[1])
         plt.plot(lig[0], lig[1],"ok-")
         plt.xlabel('Atom index')
@@ -275,7 +318,7 @@ class md_analysis():
         2. the fingerprint csv file that facilitate you to calculate the overall percent of precence of any interaction of interest.
         """
 
-        ligand_selection=self.u.select_atoms('not (protein or resname %s or resname NA or resname CL)' % self.solvent_str)
+        ligand_selection=self.u.select_atoms(self.ligand_str)
         if '.pdb' in self.pdb:
             ligand_selection.guess_bonds(vdwradii={"Cl": 1.75,"Br": 1.85,"I": 1.98})
         ligand_mol = plf.Molecule.from_mda(ligand_selection)
@@ -285,8 +328,7 @@ class md_analysis():
         pocket_selection = self.u.select_atoms("(protein) and byres around 6.0 group ligand",ligand=ligand_selection)
         if '.pdb' in self.pdb:
             pocket_selection.guess_bonds()
-        #print(plf.Fingerprint.list_available())
-        # use default interactions
+
         fp = plf.Fingerprint()
         
         # run on a slice of the trajectory frames: from begining to end with a step of 10
@@ -300,10 +342,69 @@ class md_analysis():
         plt.savefig(os.path.join(self.working_directory,'analysis','%s_prolig.png' % (self.pdb)))
         plt.close('all')
         print('the result figure is saved in %s/analysis/%s_prolig.png\n' % (self.working_directory, self.pdb))
-
+    
+    def conserved_water(self,threshold=0.5,selection='byres (around 3.5 protein)'):
+        pdbfile = input('please specify the name of the pdb file:\n')
+        print('read pdb file...')
+        u0 = mda.Universe(os.path.join(self.working_directory, 'analysis', pdbfile))
+        print('iterating trajectory...')
+        
+        coords_list=[]
+        water_list=[]
+        for idx,ts in enumerate(u0.trajectory):
+            print(idx)
+            water_atoms = u0.select_atoms(selection)
+            for atom in water_atoms:
+                #print(atom.name,atom.index,atom.resid,atom.position)
+                if atom.name=='O':
+                    full_name='%s_%s' % (idx,atom.resid)
+                    coords_list.append(atom.position)
+                    water_list.append(full_name)
+                    print(full_name,atom.position)
+                    
+        coords_ary=np.array(coords_list)
+        ac = AgglomerativeClustering(n_clusters=None, affinity='euclidean', linkage='single',
+                                     distance_threshold=0.5)
+        labels = ac.fit_predict(coords_ary)
+        label_dict={}
+        for label in labels:
+            if not label in label_dict.keys():
+                label_dict[label]=0
+            label_dict[label] += 1
+        
+        if not os.path.exists(os.path.join(self.working_directory,'analysis', 'conserved_water')):
+            os.mkdir('%s/analysis/conserved_water' % (self.working_directory))
+        csv_file=os.path.join(self.working_directory,'analysis','conserved_water', '%s_conserved_waters.csv' % pdbfile)
+        with open(csv_file,'a') as f:
+            for label,cluster in zip(labels,water_list):
+                f.write('%s,%s,%s,%.3f\n' %(label,cluster,label_dict[label],label_dict[label]/len(u0.trajectory)))
+        df=pd.read_csv(csv_file, header=None)
+        df.columns=['cluster_id', 'water_id', 'entries', 'frequency']
+        df.to_csv(csv_file)
+        filtered_df = df[df['frequency'] > threshold]
+        save_dict={}
+        if not filtered_df.empty:
+            for each_id in filtered_df['water_id'].values:
+                prot_id,wat_id =each_id.split('_')
+                if not prot_id in save_dict.keys():
+                    save_dict[prot_id]=[]
+                save_dict[prot_id].append(wat_id)
+        for idx in save_dict.keys():
+            a=' or resid '.join(save_dict[idx])
+            print(save_dict[idx])
+            ts=u0.trajectory[int(idx)]
+            protein_to_save = u0.select_atoms('protein or %s or resid %s' % (self.ligand_str,a))
+            
+            protein_to_save.write(os.path.join(self.working_directory,'analysis','conserved_water','%s_%s.pdb' % (pdbfile,idx)))
+        
     def run(self):
-        pdbfile, dcdfile = input(
-            'please specify the name of the pdb file and dcd file e.g. com.prmtop, traj.dcd\n').split(',')
+        for file_name in os.listdir(self.working_directory):
+            if "_system.pdb" in file_name:
+                pdbfile=file_name
+        for file_name in os.listdir(os.path.join(self.working_directory,'results')):
+            if "_trajectory.dcd" in file_name:
+                dcdfile=file_name
+        print('detected pdbfile and dcffile as %s and %s' %(pdbfile,dcdfile))
         if input('apo structure? (1) Yes (2) No\n') == '1':
             apo = True
         else:
@@ -327,9 +428,19 @@ class md_analysis():
             elif job == '5':
                 print('analyzing protein-ligand interaction...')
                 self.pro_lig_int()
+            elif job == '6':
+                print('analyzing protein-ligand heatmap...')
+                self.heatmap()
+            elif job == '7':
+                print('analyzing conserved water molecules...')
+                self.conserved_water()
             elif job == '0':
                 break
-
+def test():
+    work_dir='test'
+    mda_ana=md_analysis(directory=work_dir)
+    #mda_ana.read_pdb_dcd('5o1c_14586_system.pdb', '5o1c_14586_2ns_new_trajectory.dcd',apo=False)
+    mda_ana.conserved_water()
 
 if __name__ == '__main__':
     work_dir=input('please input the name of working directory\n')
