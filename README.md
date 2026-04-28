@@ -36,6 +36,13 @@ conda install -c conda-forge prolif
 ```
 
 # Usage:
+A MD simulation will start by creating a new folder in working_directory (e.g. "example"), where a pdb file of protein-ligand complex will be located (e.g. pro-lig.pdb).
+
+A. run a openmm simulation of protein-ligand complex by openmm_simulation.py
+1. Type: ```conda activate openmm``` to activate the virtual environment
+2. Type: python openmm_simulation.py
+
+B. Analysis the MD results by mdanalyzer.py
 1.	Please put this script outside of the folder containing your MD results. For example, the MD topology file and MD trajectory are located at /data/usr/md1, please put this script to /data/usr
 2.	Go to the directory: ```cd /data/usr```
 3.	Type: ```conda activate openmm``` to activate the virtual environment
@@ -55,8 +62,12 @@ please select the mode:
 (1) rmsd
 (2) extract complex
 (3) distance analysis
-(4) ligand rmsf
+(4) rmsf
 (5) protein-ligand fingerprint
+(6) dihedral angle analysis
+(7) protein-ligand heatmap
+(8) secondary structure analysis
+(9) clustering analysis
 (0) quit
 ```
 
