@@ -36,12 +36,25 @@ conda install -c conda-forge prolif
 ```
 
 # Usage:
-A MD simulation will start by creating a new folder in working_directory (e.g. "example"), where a pdb file of protein-ligand complex will be located (e.g. pro-lig.pdb).
-
+A MD simulation will start by creating a new folder in working_directory (e.g. "example"), where the following files are requied:
+1. a pdb file of a protein-ligand complex/apo protein prepared by MOE will be located (e.g. pro-lig.pdb).
+2. a sdf file of the very ligand in the protein-ligand complex (not require if your protein is a apo protein), e.g lig.sdf
+   
 A. run a openmm simulation of protein-ligand complex by openmm_simulation.py
 1. Type: ```conda activate openmm``` to activate the virtual environment
-2. Type: python openmm_simulation.py
-
+2. Type: python openmm_simulation.py, and the terminal will show as:
+   ```Enter working directory (Enter for current):```
+3. Type your newly created folder name (e.g. example) and enter, and the terminal will show as:
+    ```Enter PDB filename:```
+4. Type your pdb name (e.g. pro-lig.pdb) and enter, and the terminal will show as:
+   ```Enter simulation time (ns):```
+5. Type the simulation time as ns: 2.0 and enter, and the terminal will show as: 
+  ```Enter job name:```
+6. Type the job name (e.g. test), and the terminal will show as:
+   ```Do you have a ligand (SDF)? (y/n):```
+   Enter "y" (if you are runing a apo protein, enter "n"), and the terminal will show as:
+   ```Enter SDF filename:```
+   
 B. Analysis the MD results by mdanalyzer.py
 1.	Please put this script outside of the folder containing your MD results. For example, the MD topology file and MD trajectory are located at /data/usr/md1, please put this script to /data/usr
 2.	Go to the directory: ```cd /data/usr```
