@@ -14,6 +14,17 @@ This python script provides a simple way to perform the routine analysis of MD t
 # Installation:
 The following installation is built on the previous installation, with one additional package, ProLif, required for the calculation of protein-ligand fingerprint. Please use the following command:
 ```
+A. OpenMM
+# create a new virtual environment:
+conda create -n openmm python=3.12
+# activate virtual environment
+conda activate openmm
+#install mdanalysis 
+conda install -c conda-forge openmm cuda-version=12
+# install openmmforcefields
+conda install --yes -c conda-forge openmmforcefields
+
+B. mdanalysis
 # create a new virtual environment:
 conda create -n mda python=3.12
 # activate virtual environment
