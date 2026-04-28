@@ -15,9 +15,9 @@ This python script provides a simple way to perform the routine analysis of MD t
 The following installation is built on the previous installation, with one additional package, ProLif, required for the calculation of protein-ligand fingerprint. Please use the following command:
 ```
 # create a new virtual environment:
-conda create -n mdanalyzer python=3.9
+conda create -n mda python=3.12
 # activate virtual environment
-conda activate mdanalyzer
+conda activate mda
 #install mdanalysis 
 conda install -c conda-forge mdanalysis
 # install prolif
