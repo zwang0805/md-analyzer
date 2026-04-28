@@ -813,20 +813,7 @@ def test():
     #mda_ana.get_frames_by_time(start_time=0,end_time=100)
     #mda_ana.cluster_md_trajectory(start=0,end=10)
     mda_ana.distance_analysis()
-    #mda_ana.PCA()
-    #mda_ana.distance_correlation()
 
-def main2():
-    work_dir='KDM7A_homo_023_20260421_1'
-    mda_ana=md_analysis(directory=work_dir)
-    mda_ana.read_pdb_dcd('com_no_resname_Na+_system.pdb', 'trajectory_no_resname_Na+.dcd',apo=False,remove_subunits='no',solv_selection='HOH',lig_selection='MOL')
-    #mda_ana.calculate_angle_trajectory('20,21,22')
-    #mda_ana.get_frames_by_time(start_time=0,end_time=100)
-    #mda_ana.dihedral_angle(atom_label='',dist_step=10,ligand=True)
-    mda_ana.cluster_md_trajectory(start=100,end=200)
-    #mda_ana.extract_complex(start=100, end=200, slices=500)
-    #mda_ana.PCA()
-    #mda_ana.distance_correlation()
 
 if __name__ == '__main__':
     #test()
