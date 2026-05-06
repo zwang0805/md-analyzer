@@ -173,7 +173,8 @@ class MDAnalyzer:
             self.u.add_TopologyAttr('elements', elements)
 
         # Build reference for alignment (first-frame protein)
-        ref_universe = mda.Universe(topo_path)
+        ref_universe = mda.Universe(topo_path, traj_path)
+        ref_universe.trajectory[0]
         if self.delete_units:
             reference = ref_universe.select_atoms(
                 'protein and (not (%s))' % self.delete_units)
@@ -185,7 +186,7 @@ class MDAnalyzer:
             chain.atoms for chain in self.u.select_atoms('protein').segments
             if chain.atoms.n_atoms > 0
         ]
-        print(f'Protein chains: {[c.segids for c in self.u.select_atoms("protein").segments]}')
+        print(f'Protein chains: {[c.segid for c in self.u.select_atoms("protein").segments]}')
         prot_group = GroupHug(prot_chain_list[0], *prot_chain_list[1:])
 
         # On-the-fly transformation pipeline
@@ -396,13 +397,11 @@ class MDAnalyzer:
 
         df = pd.DataFrame({'time': time_ids, 'distance (A)': dist})
 
-        window = 10
-        dist_smooth = np.convolve(dist, np.ones(window) / window, mode='valid')
-        half = window // 2
+        window = min(10, len(dist))
+        dist_smooth = np.convolve(dist, np.ones(window) / window, mode='same')
 
         plt.plot(time_ids, dist, alpha=0.5, label='raw')
-        plt.plot(time_ids[half: -half + 1 if half > 1 else None],
-                 dist_smooth, color='red', linewidth=2, label='moving avg')
+        plt.plot(time_ids, dist_smooth, color='red', linewidth=2, label='moving avg')
         plt.xlabel('Time')
         plt.ylabel(r'Distance ($\AA$)')
         plt.title('Distance (mean=%.2f Å, std=%.2f Å)' % (
